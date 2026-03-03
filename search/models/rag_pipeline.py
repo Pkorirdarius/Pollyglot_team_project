@@ -5,12 +5,11 @@ Core RAG pipeline: retrieve relevant chunks then generate an answer.
 
 Works with Anthropic Claude or OpenAI GPT — toggled via LLM_PROVIDER env var.
 """
-
 from __future__ import annotations
 
 import time
 from uuid import uuid4
-
+import google.generativeai as genai
 from loguru import logger
 
 from config.settings import settings
@@ -56,27 +55,34 @@ def _call_anthropic(system: str, user: str) -> str:
     return response.content[0].text
 
 
-def _call_openai(system: str, user: str) -> str:
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
-    response = client.chat.completions.create(
-        model=settings.llm_model,
-        max_tokens=settings.max_tokens,
-        temperature=settings.temperature,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
+def _call_gemini(system: str, user: str) -> str:
+    
+    genai.configure(api_key=settings.gemini_api_key)
+    
+    # Gemini handles System Instructions during model initialization
+    model = genai.GenerativeModel(
+        model_name=settings.llm_model,
+        system_instruction=system
     )
-    return response.choices[0].message.content
+    
+    response = model.generate_content(
+        user,
+        generation_config=genai.types.GenerationConfig(
+            max_output_tokens=settings.max_tokens,
+            temperature=settings.temperature,
+        )
+    )
+    return response.text
 
 
 def _generate(system: str, user: str) -> str:
+    # Logic to switch between providers based on your ENV settings
     if settings.llm_provider == "anthropic":
         return _call_anthropic(system, user)
-    elif settings.llm_provider == "openai":
-        return _call_openai(system, user)
-    raise ValueError(f"Unknown LLM provider: {settings.llm_provider}")
+    elif settings.llm_provider == "gemini":
+        return _call_gemini(system, user)
+    
+    raise ValueError(f"Unsupported or unknown LLM provider: {settings.llm_provider}")
 
 
 # ── Public pipeline entry point ───────────────────────────────────────────────
@@ -86,7 +92,7 @@ def run_rag_query(request: QueryRequest) -> QueryResponse:
     Full RAG pipeline:
       1. Embed the query and retrieve relevant chunks from the vector store.
       2. Build a context-aware prompt.
-      3. Call the LLM and return a structured QueryResponse.
+      3. Call the LLM (Gemini or Anthropic) and return a structured QueryResponse.
     """
     t0 = time.perf_counter()
     session_id = request.session_id or str(uuid4())
