@@ -47,8 +47,8 @@ class DocumentMetadata(BaseModel):
         "general", "legal", "medical", "technical", "literary",
         "news", "conversational", "academic", "business"
     ] = Field("general", description="Subject domain for domain-adapted translation")
-    register: Literal["formal", "informal", "neutral"] = Field(
-        "neutral", description="Linguistic register of the text"
+    text_register: Literal["formal", "informal", "neutral"] = Field(
+        "neutral", alias="register", description="Linguistic register of the text"
     )
 
     # Ingestion provenance
@@ -85,7 +85,7 @@ class MetadataFilter(BaseModel):
     target_language: str | None = None
     language_pair: str | None = None
     domain: str | None = None
-    register: str | None = None
+    text_register: str | None = Field(None, alias="register")
     doc_type: str | None = None
     source: str | None = None   # filter by filename
 
