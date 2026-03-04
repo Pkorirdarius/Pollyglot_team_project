@@ -13,9 +13,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from langchain.schema import Document
+from langchain_core.documents import Document
 from loguru import logger
-
+# OpenAI fallback
+from langchain_openai import OpenAIEmbeddings
+from langchain_pinecone import PineconeVectorStore
 from config.settings import settings
 
 if TYPE_CHECKING:
@@ -42,9 +44,7 @@ def _get_embeddings(task_type: str = "retrieval_document"):
             task_type=task_type,
         )
 
-    # OpenAI fallback
-    from langchain_openai import OpenAIEmbeddings
-
+    
     return OpenAIEmbeddings(
         model=settings.embedding_model,
         openai_api_key=settings.openai_api_key,
@@ -69,8 +69,7 @@ def get_vectorstore(
         )
 
     if settings.vectorstore_provider == "pinecone":
-        from langchain_pinecone import PineconeVectorStore
-
+        
         return PineconeVectorStore(
             index_name=settings.pinecone_index_name,
             embedding=embeddings,
@@ -102,8 +101,7 @@ def ingest_documents(
         )
 
     elif settings.vectorstore_provider == "pinecone":
-        from langchain_pinecone import PineconeVectorStore
-
+        
         PineconeVectorStore.from_documents(
             documents=documents,
             embedding=embeddings,

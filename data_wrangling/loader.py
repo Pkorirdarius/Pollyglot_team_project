@@ -20,7 +20,7 @@ from langchain_community.document_loaders import (
     UnstructuredURLLoader,
 )
 from loguru import logger
-
+from langdetect import detect  # Optional dependency for language auto-detection
 from config.settings import settings
 from search.models.schemas import DocumentMetadata
 
@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 
 def _detect_language(text: str) -> str | None:
     try:
-        from langdetect import detect
         return detect(text[:2000])          # sample first 2000 chars for speed
     except Exception:
         return None
