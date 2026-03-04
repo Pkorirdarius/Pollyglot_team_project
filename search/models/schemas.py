@@ -22,6 +22,7 @@ class DocumentMetadata(BaseModel):
     Enables self-querying retrieval: the LLM can generate structured filters
     (e.g. source_language="fr", domain="legal") before hitting the vector store.
     """
+    model_config = {"populate_by_name": True}
     # Identity
     source: str = Field(..., description="Filename or URL of the original document")
     chunk_index: int = Field(0, description="Position of this chunk in its parent document")
@@ -81,6 +82,7 @@ class MetadataFilter(BaseModel):
     Structured filter the LLM produces during self-querying retrieval.
     Fields mirror DocumentMetadata's filterable columns.
     """
+    model_config = {"populate_by_name": True}
     source_language: str | None = None
     target_language: str | None = None
     language_pair: str | None = None
