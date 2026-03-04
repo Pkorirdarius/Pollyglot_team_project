@@ -4,141 +4,763 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Polyglot AI</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg:      #0f0f0f;
-    --surface: #1a1a1a;
-    --border:  #2a2a2a;
-    --text:    #e8e8e8;
-    --muted:   #666;
-    --accent:  #5b8dee;
-    --user-bg: #1e2a3a;
-  }
-  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; line-height: 1.65; }
-  #app { display: flex; flex-direction: column; height: 100vh; max-width: 740px; margin: 0 auto; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  #thread { flex: 1; overflow-y: auto; padding: 32px 24px 16px; display: flex; flex-direction: column; gap: 28px; scroll-behavior: smooth; }
-  #thread::-webkit-scrollbar { width: 4px; }
-  #thread::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+:root {
+  --bg:          #09090e;
+  --surface:     #111118;
+  --surface2:    #18181f;
+  --surface3:    #1f1f28;
+  --border:      #23232f;
+  --border2:     #2e2e3e;
+  --text:        #ddddf0;
+  --text2:       #9898b8;
+  --muted:       #52526a;
+  --accent:      #6b7fff;
+  --accent2:     #4a5be0;
+  --accent-glow: rgba(107,127,255,0.12);
+  --gemini:      #4285f4;
+  --anthropic:   #c84b2f;
+  --success:     #3ecf6e;
+  --warn:        #f0a500;
+  --error:       #f04545;
+  --user-bg:     #14142a;
+  --drawer-w:    340px;
+}
 
-  .msg { display: flex; gap: 14px; animation: fadeUp .25s ease both; }
-  .msg.user { flex-direction: row-reverse; }
-  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; line-height: 1.65; overflow: hidden; }
 
-  .avatar { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:500; flex-shrink:0; margin-top:2px; }
-  .avatar.ai   { background: var(--accent); color:#fff; }
-  .avatar.user { background:#2e2e2e; color:var(--muted); }
+/* ── Shell ── */
+#shell { display: flex; height: 100vh; position: relative; }
 
-  .bubble { max-width:82%; padding:12px 16px; border-radius:14px; font-size:14.5px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
-  .ai   .bubble { background:var(--surface); border:1px solid var(--border); border-radius:4px 14px 14px 14px; }
-  .user .bubble { background:var(--user-bg); border:1px solid #263042; border-radius:14px 4px 14px 14px; }
+/* ── Drawer ── */
+#drawer {
+  width: var(--drawer-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: transform .3s cubic-bezier(.4,0,.2,1), width .3s;
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+#drawer.collapsed { transform: translateX(calc(-1 * var(--drawer-w))); width: 0; }
 
-  .dots span { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--muted); margin:0 2px; animation:blink 1.2s ease-in-out infinite; }
-  .dots span:nth-child(2) { animation-delay:.2s; }
-  .dots span:nth-child(3) { animation-delay:.4s; }
-  @keyframes blink { 0%,80%,100%{opacity:.2;transform:scale(.8);} 40%{opacity:1;transform:scale(1);} }
+#drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 15px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#drawer-header h2 { font-size: .78rem; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--text2); }
+#drawer-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: .95rem; padding: 3px 5px; border-radius: 4px; transition: color .15s, background .15s; }
+#drawer-close:hover { color: var(--text); background: var(--surface2); }
 
-  #bar { padding:16px 24px 24px; background:var(--bg); }
-  #input-wrap { display:flex; align-items:flex-end; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:10px 10px 10px 16px; transition:border-color .15s; }
-  #input-wrap:focus-within { border-color:#3d5a99; }
-  textarea { flex:1; background:none; border:none; outline:none; resize:none; font:inherit; font-size:14.5px; color:var(--text); line-height:1.6; max-height:160px; overflow-y:auto; }
-  textarea::placeholder { color:var(--muted); }
-  textarea::-webkit-scrollbar { width:3px; }
-  textarea::-webkit-scrollbar-thumb { background:var(--border); }
+#drawer-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 18px; }
+#drawer-body::-webkit-scrollbar { width: 3px; }
+#drawer-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
-  #send-btn { width:34px; height:34px; flex-shrink:0; background:var(--accent); border:none; border-radius:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s, opacity .15s; }
-  #send-btn:hover { background:#7aa0f5; }
-  #send-btn:disabled { opacity:.35; cursor:default; }
-  #send-btn svg { width:16px; height:16px; fill:#fff; }
-  #hint { text-align:center; font-size:11.5px; color:#444; margin-top:10px; }
+/* Drop zone */
+#drop-zone {
+  border: 1.5px dashed var(--border2);
+  border-radius: 12px;
+  padding: 26px 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  position: relative;
+  background: var(--surface2);
+}
+#drop-zone:hover, #drop-zone.drag-over { border-color: var(--accent); background: var(--accent-glow); }
+#drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+#drop-zone .dz-icon { font-size: 1.9rem; margin-bottom: 7px; display: block; }
+#drop-zone .dz-label { font-size: .8rem; color: var(--text2); line-height: 1.5; }
+#drop-zone .dz-label strong { color: var(--accent); }
+#drop-zone .dz-types { font-size: .67rem; color: var(--muted); margin-top: 4px; font-family: 'IBM Plex Mono', monospace; }
 
-  #empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--muted); text-align:center; padding-bottom:60px; }
-  #empty p { font-size:22px; font-weight:300; color:#555; }
-  #empty span { font-size:13px; }
+/* File pill */
+#file-pill { display: none; align-items: center; gap: 10px; background: var(--surface3); border: 1px solid var(--border2); border-radius: 8px; padding: 9px 12px; }
+#file-pill .fp-icon { font-size: 1.2rem; flex-shrink: 0; }
+#file-pill .fp-info { flex: 1; min-width: 0; }
+#file-pill .fp-name { font-size: .78rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#file-pill .fp-size { font-size: .68rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+#file-pill .fp-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: .85rem; padding: 3px; border-radius: 4px; transition: color .15s; flex-shrink: 0; }
+#file-pill .fp-clear:hover { color: var(--error); }
+
+/* Metadata fields */
+.field-group { display: flex; flex-direction: column; gap: 9px; }
+.field-row { display: flex; gap: 7px; }
+.field { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.field label { font-size: .67rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.field select {
+  background: var(--surface3); color: var(--text);
+  border: 1px solid var(--border2); border-radius: 7px;
+  padding: 5px 8px; font-size: .78rem; font-family: inherit;
+  outline: none; transition: border-color .15s; width: 100%; -webkit-appearance: none;
+}
+.field select:focus { border-color: var(--accent); }
+
+/* Ingest button */
+#ingest-btn {
+  width: 100%; padding: 9px; border-radius: 9px;
+  background: var(--accent); color: #fff; border: none;
+  font-family: inherit; font-size: .83rem; font-weight: 600;
+  cursor: pointer; transition: background .15s, opacity .15s, transform .1s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+#ingest-btn:hover { background: var(--accent2); }
+#ingest-btn:active { transform: scale(.98); }
+#ingest-btn:disabled { opacity: .35; cursor: default; transform: none; }
+
+/* Progress bar */
+#progress-wrap { display: none; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
+#progress-bar  { height: 100%; width: 0; background: var(--accent); transition: width .4s ease; border-radius: 2px; }
+
+/* Ingest log */
+#ingest-log {
+  display: none;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 12px; font-family: 'IBM Plex Mono', monospace;
+  font-size: .7rem; color: var(--text2); max-height: 130px; overflow-y: auto; line-height: 1.7;
+}
+#ingest-log .log-ok    { color: var(--success); }
+#ingest-log .log-warn  { color: var(--warn); }
+#ingest-log .log-error { color: var(--error); }
+
+/* KB list */
+#kb-section h3 { font-size: .68rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }
+#kb-list { display: flex; flex-direction: column; gap: 5px; }
+.kb-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 8px;
+  animation: fadeUp .2s ease both;
+}
+.kb-item .kb-icon { font-size: .95rem; flex-shrink: 0; }
+.kb-item .kb-info { flex: 1; min-width: 0; }
+.kb-item .kb-name { font-size: .76rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb-item .kb-meta { font-size: .64rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+.kb-item .kb-badge { font-size: .58rem; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--border2); color: var(--muted); white-space: nowrap; }
+#kb-empty { font-size: .76rem; color: var(--muted); text-align: center; padding: 14px 0; }
+
+/* ── Main ── */
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+/* Top bar */
+#topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0; gap: 10px;
+}
+#topbar-left { display: flex; align-items: center; gap: 10px; }
+#kb-toggle {
+  background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--text2); border-radius: 8px; padding: 5px 11px;
+  font-size: .76rem; font-family: inherit; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  transition: border-color .15s, color .15s; white-space: nowrap;
+}
+#kb-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.kb-count { background: var(--accent); color: #fff; border-radius: 8px; padding: 1px 6px; font-size: .62rem; font-weight: 600; display: none; }
+.kb-count.visible { display: inline; }
+#app-title { font-size: .93rem; font-weight: 500; }
+#app-title span { color: var(--accent); }
+#providers { display: flex; gap: 7px; align-items: center; }
+.prov-dot { display: flex; align-items: center; gap: 5px; font-size: .68rem; font-family: 'IBM Plex Mono', monospace; color: var(--muted); padding: 3px 9px; border-radius: 20px; border: 1px solid var(--border); white-space: nowrap; }
+.prov-dot .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background .3s; }
+.prov-dot.ok .dot { background: var(--success); box-shadow: 0 0 5px var(--success); }
+
+/* Settings bar */
+#settings-bar { display: flex; gap: 8px; align-items: center; padding: 8px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; flex-shrink: 0; }
+#settings-bar label { font-size: .7rem; color: var(--muted); white-space: nowrap; font-weight: 500; }
+#settings-bar select { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); border-radius: 6px; padding: 4px 8px; font-size: .76rem; font-family: inherit; outline: none; cursor: pointer; transition: border-color .15s; -webkit-appearance: none; }
+#settings-bar select:focus { border-color: var(--accent); }
+.s-sep { width: 1px; height: 20px; background: var(--border2); margin: 0 2px; }
+
+/* Thread */
+#thread { flex: 1; overflow-y: auto; padding: 22px 22px 8px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth; }
+#thread::-webkit-scrollbar { width: 4px; }
+#thread::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* Messages */
+.msg { display: flex; gap: 11px; animation: fadeUp .22s ease both; }
+.msg.user { flex-direction: row-reverse; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; } }
+
+.avatar { width: 27px; height: 27px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: .62rem; font-weight: 700; flex-shrink: 0; margin-top: 4px; font-family: 'IBM Plex Mono', monospace; }
+.avatar.ai   { background: var(--accent-glow); color: var(--accent); border: 1px solid #2e3478; }
+.avatar.user { background: #1a1a30; color: var(--muted); border: 1px solid var(--border); }
+
+.bubble { max-width: 87%; }
+.bubble-inner { padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.78; white-space: pre-wrap; word-break: break-word; }
+.ai   .bubble-inner { background: var(--surface); border: 1px solid var(--border); border-radius: 3px 12px 12px 12px; }
+.user .bubble-inner { background: var(--user-bg); border: 1px solid #1e1e48; border-radius: 12px 3px 12px 12px; }
+
+/* Meta tags */
+.msg-meta { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; align-items: center; }
+.tag { font-size: .62rem; font-family: 'IBM Plex Mono', monospace; background: var(--surface2); border: 1px solid var(--border2); border-radius: 4px; padding: 2px 7px; color: var(--muted); white-space: nowrap; }
+.tag.gemini    { border-color: #1e3060; color: var(--gemini); }
+.tag.anthropic { border-color: #501a0a; color: var(--anthropic); }
+.tag.lang      { border-color: #1a3020; color: #4ecb71; }
+
+/* Filter pill */
+.filter-pill { margin-top: 5px; padding: 5px 10px; background: var(--surface2); border-left: 2px solid var(--accent); border-radius: 4px; font-size: .66rem; font-family: 'IBM Plex Mono', monospace; color: var(--muted); cursor: pointer; user-select: none; }
+.filter-pill:hover { background: var(--surface3); }
+.filter-detail { display: none; margin-top: 4px; color: var(--text2); line-height: 1.8; }
+.filter-pill.open .filter-detail { display: block; }
+
+/* Sources */
+.sources { margin-top: 6px; }
+.sources summary { font-size: .74rem; color: var(--muted); cursor: pointer; user-select: none; outline: none; }
+.sources summary:hover { color: var(--accent); }
+.source-item { margin-top: 6px; padding: 7px 10px; background: var(--surface2); border-radius: 7px; border: 1px solid var(--border); }
+.source-item .sn { font-size: .73rem; font-weight: 500; color: var(--accent); font-family: 'IBM Plex Mono', monospace; }
+.source-item .st { font-size: .72rem; color: var(--muted); margin-top: 3px; font-style: italic; line-height: 1.5; }
+
+/* Typing dots */
+.dots span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); margin: 0 2px; animation: blink 1.2s ease-in-out infinite; }
+.dots span:nth-child(2) { animation-delay: .2s; }
+.dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%,80%,100%{opacity:.2;transform:scale(.8);} 40%{opacity:1;transform:scale(1);} }
+
+/* Input bar */
+#bar { padding: 9px 20px 16px; background: var(--bg); flex-shrink: 0; }
+#input-wrap { display: flex; align-items: flex-end; gap: 8px; background: var(--surface); border: 1px solid var(--border2); border-radius: 13px; padding: 8px 8px 8px 14px; transition: border-color .15s; }
+#input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+textarea { flex: 1; background: none; border: none; outline: none; resize: none; font: inherit; font-size: 13.5px; color: var(--text); line-height: 1.6; max-height: 140px; overflow-y: auto; }
+textarea::placeholder { color: var(--muted); }
+#send-btn { width: 31px; height: 31px; flex-shrink: 0; background: var(--accent); border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, opacity .15s, transform .1s; }
+#send-btn:hover  { background: var(--accent2); }
+#send-btn:active { transform: scale(.93); }
+#send-btn:disabled { opacity: .3; cursor: default; transform: none; }
+#send-btn svg { width: 13px; height: 13px; fill: #fff; }
+#hint { text-align: center; font-size: 10px; color: #28283a; margin-top: 6px; }
+
+/* Empty state */
+#empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); text-align: center; padding-bottom: 50px; }
+#empty .e-logo  { font-size: 2rem; margin-bottom: 2px; }
+#empty .e-title { font-size: 1.1rem; font-weight: 300; color: #383858; }
+#empty .tips    { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.tip { font-size: .71rem; color: #2e2e4a; font-family: 'IBM Plex Mono', monospace; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; cursor: pointer; transition: border-color .15s, color .15s; }
+.tip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Overlay (mobile) */
+#overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 9; }
+@media (max-width: 680px) {
+  #drawer { position: fixed; top: 0; left: 0; height: 100%; z-index: 20; }
+  #drawer.collapsed { transform: translateX(-100%); width: var(--drawer-w); }
+  #overlay.visible { display: block; }
+}
 </style>
 </head>
 <body>
-<div id="app">
-  <div id="thread">
-    <div id="empty">
-      <p>Polyglot AI</p>
-      <span>Ask anything about languages.</span>
+
+<div id="overlay"></div>
+
+<div id="shell">
+
+  <!-- ══ KNOWLEDGE BASE DRAWER ══ -->
+  <aside id="drawer">
+    <div id="drawer-header">
+      <h2>📂 Knowledge Base</h2>
+      <button id="drawer-close" title="Close panel">✕</button>
     </div>
-  </div>
-  <div id="bar">
-    <div id="input-wrap">
-      <textarea id="input" rows="1" placeholder="Message Polyglot AI…"></textarea>
-      <button id="send-btn" disabled>
-        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-      </button>
+
+    <div id="drawer-body">
+
+      <!-- Drop zone -->
+      <div id="drop-zone">
+        <input type="file" id="file-input" accept=".pdf,.txt,.docx,.csv"/>
+        <span class="dz-icon">📄</span>
+        <div class="dz-label">
+          <strong>Click to browse</strong> or drag &amp; drop<br>a document here
+        </div>
+        <div class="dz-types">PDF · TXT · DOCX · CSV</div>
+      </div>
+
+      <!-- Selected file -->
+      <div id="file-pill">
+        <span class="fp-icon" id="fp-icon">📄</span>
+        <div class="fp-info">
+          <div class="fp-name" id="fp-name"></div>
+          <div class="fp-size" id="fp-size"></div>
+        </div>
+        <button class="fp-clear" id="fp-clear" title="Remove">✕</button>
+      </div>
+
+      <!-- Metadata -->
+      <div class="field-group">
+        <div class="field-row">
+          <div class="field">
+            <label>Source lang</label>
+            <select id="ingest-src">
+              <option value="">Auto-detect</option>
+              <option value="en">English</option><option value="fr">French</option>
+              <option value="es">Spanish</option><option value="de">German</option>
+              <option value="it">Italian</option><option value="pt">Portuguese</option>
+              <option value="ru">Russian</option><option value="ar">Arabic</option>
+              <option value="zh">Chinese</option><option value="ja">Japanese</option>
+              <option value="ko">Korean</option><option value="sw">Swahili</option>
+              <option value="hi">Hindi</option><option value="tr">Turkish</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Target lang</label>
+            <select id="ingest-tgt">
+              <option value="">None</option>
+              <option value="en">English</option><option value="fr">French</option>
+              <option value="es">Spanish</option><option value="de">German</option>
+              <option value="it">Italian</option><option value="pt">Portuguese</option>
+              <option value="ru">Russian</option><option value="ar">Arabic</option>
+              <option value="zh">Chinese</option><option value="ja">Japanese</option>
+              <option value="ko">Korean</option><option value="sw">Swahili</option>
+              <option value="hi">Hindi</option><option value="tr">Turkish</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Domain</label>
+            <select id="ingest-domain">
+              <option value="general">general</option>
+              <option value="legal">legal</option>
+              <option value="medical">medical</option>
+              <option value="technical">technical</option>
+              <option value="literary">literary</option>
+              <option value="news">news</option>
+              <option value="conversational">conversational</option>
+              <option value="academic">academic</option>
+              <option value="business">business</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Register</label>
+            <select id="ingest-register">
+              <option value="neutral">neutral</option>
+              <option value="formal">formal</option>
+              <option value="informal">informal</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress + button -->
+      <div>
+        <div id="progress-wrap"><div id="progress-bar"></div></div>
+        <button id="ingest-btn" disabled>
+          <span id="ingest-icon">✨</span>
+          <span id="ingest-label">Ingest Document</span>
+        </button>
+      </div>
+
+      <!-- Log -->
+      <div id="ingest-log"></div>
+
+      <!-- Ingested docs list -->
+      <div id="kb-section">
+        <h3>Ingested Documents</h3>
+        <div id="kb-list">
+          <div id="kb-empty">No documents yet.</div>
+        </div>
+      </div>
+
     </div>
-    <div id="hint">Enter to send · Shift+Enter for new line</div>
+  </aside>
+
+  <!-- ══ MAIN CHAT ══ -->
+  <div id="main">
+
+    <!-- Top bar -->
+    <div id="topbar">
+      <div id="topbar-left">
+        <button id="kb-toggle">
+          📂 Knowledge Base
+          <span class="kb-count" id="kb-count">0</span>
+        </button>
+        <div id="app-title">🌐 <span>Polyglot</span> AI</div>
+      </div>
+      <div id="providers">
+        <div class="prov-dot" id="dot-gemini"><span class="dot"></span>Gemini</div>
+        <div class="prov-dot" id="dot-anthropic"><span class="dot"></span>Anthropic</div>
+      </div>
+    </div>
+
+    <!-- Settings bar -->
+    <div id="settings-bar">
+      <label>From</label>
+      <select id="src-lang">
+        <option value="">Auto-detect</option>
+        <option value="en">English</option><option value="fr">French</option>
+        <option value="es">Spanish</option><option value="de">German</option>
+        <option value="it">Italian</option><option value="pt">Portuguese</option>
+        <option value="ru">Russian</option><option value="ar">Arabic</option>
+        <option value="zh">Chinese</option><option value="ja">Japanese</option>
+        <option value="ko">Korean</option><option value="sw">Swahili</option>
+        <option value="hi">Hindi</option><option value="tr">Turkish</option>
+      </select>
+      <label>To</label>
+      <select id="tgt-lang">
+        <option value="">Auto</option>
+        <option value="en">English</option><option value="fr">French</option>
+        <option value="es">Spanish</option><option value="de">German</option>
+        <option value="it">Italian</option><option value="pt">Portuguese</option>
+        <option value="ru">Russian</option><option value="ar">Arabic</option>
+        <option value="zh">Chinese</option><option value="ja">Japanese</option>
+        <option value="ko">Korean</option><option value="sw">Swahili</option>
+        <option value="hi">Hindi</option><option value="tr">Turkish</option>
+      </select>
+      <div class="s-sep"></div>
+      <label>Domain</label>
+      <select id="domain">
+        <option value="">(auto)</option>
+        <option value="general">general</option><option value="legal">legal</option>
+        <option value="medical">medical</option><option value="technical">technical</option>
+        <option value="literary">literary</option><option value="news">news</option>
+        <option value="conversational">conversational</option>
+        <option value="academic">academic</option><option value="business">business</option>
+      </select>
+      <div class="s-sep"></div>
+      <label>Provider</label>
+      <select id="provider-pref">
+        <option value="auto">auto</option>
+        <option value="gemini">Gemini</option>
+        <option value="anthropic">Anthropic</option>
+      </select>
+    </div>
+
+    <!-- Thread -->
+    <div id="thread">
+      <div id="empty">
+        <div class="e-logo">🌐</div>
+        <div class="e-title">Translate anything, instantly.</div>
+        <div class="tips">
+          <div class="tip" onclick="fillInput(this)">Translate "Bonjour le monde" to English</div>
+          <div class="tip" onclick="fillInput(this)">How do you say "legal contract" formally in Spanish?</div>
+          <div class="tip" onclick="fillInput(this)">What's the difference between passé composé and imparfait?</div>
+          <div class="tip" onclick="fillInput(this)">Translate this medical text from German to English</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input bar -->
+    <div id="bar">
+      <div id="input-wrap">
+        <textarea id="input" rows="1" placeholder="Type text to translate or ask a language question…"></textarea>
+        <button id="send-btn" disabled>
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+      <div id="hint">Enter ↵ to send · Shift+Enter for new line</div>
+    </div>
+
   </div>
 </div>
+
 <script>
-  const thread  = document.getElementById('thread');
-  const input   = document.getElementById('input');
-  const sendBtn = document.getElementById('send-btn');
+const API_BASE = 'http://localhost:8000';
 
-  const RESPONSES = [
-    { match: /\b(il est|c'est|cest)\b/i,
-      text: "Great question! In French:\n\n**c'est** — use when followed by an article + noun:\n*C'est un médecin.*\n\n**il est** — use when the noun stands alone as a profession or nationality:\n*Il est médecin.*\n\nAdd any modifier → switch to c'est." },
-    { match: /\b(subjunctive|subjonctif)\b/i,
-      text: "The subjunctive (*subjonctif*) expresses doubt, necessity, or emotion. Triggered after verbs like *vouloir que*, *il faut que*, *bien que*.\n\nExample: *Il faut que tu viennes.* (You need to come.)" },
-    { match: /\b(passé composé|imparfait|past tense)\b/i,
-      text: "Both describe the past but differently:\n\n**Imparfait** — background states, ongoing actions: *Je mangeais quand…*\n**Passé composé** — completed events: *…il est arrivé.*\n\nImparfait sets the scene. Passé composé is the action." },
-    { match: /\b(bonjour|salut|hello|hi|hey)\b/i,
-      text: "Bonjour ! Ask me about any grammar point, vocabulary, or share a sentence you'd like me to correct." },
-  ];
+// ── DOM refs ─────────────────────────────────────────────────────────────────
+const drawer    = document.getElementById('drawer');
+const overlay   = document.getElementById('overlay');
+const thread    = document.getElementById('thread');
+const input     = document.getElementById('input');
+const sendBtn   = document.getElementById('send-btn');
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const filePill  = document.getElementById('file-pill');
+const ingestBtn = document.getElementById('ingest-btn');
+const ingestLog = document.getElementById('ingest-log');
+const progWrap  = document.getElementById('progress-wrap');
+const progBar   = document.getElementById('progress-bar');
+const kbList    = document.getElementById('kb-list');
+const kbCount   = document.getElementById('kb-count');
 
-  function getReply(text) {
-    for (const r of RESPONSES) if (r.match.test(text)) return r.text;
-    return "That's interesting — could you share a bit more context? Which language are you working on, and what specifically is tripping you up?";
+let selectedFile = null;
+let kbDocs = [];
+
+// ── Drawer ───────────────────────────────────────────────────────────────────
+const openDrawer  = () => { drawer.classList.remove('collapsed'); overlay.classList.add('visible'); };
+const closeDrawer = () => { drawer.classList.add('collapsed');    overlay.classList.remove('visible'); };
+
+document.getElementById('kb-toggle').addEventListener('click', () =>
+  drawer.classList.contains('collapsed') ? openDrawer() : closeDrawer()
+);
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+overlay.addEventListener('click', closeDrawer);
+
+// Open by default on desktop
+if (window.innerWidth > 680) openDrawer();
+
+// ── File selection ───────────────────────────────────────────────────────────
+const FILE_ICONS = { pdf:'📕', txt:'📄', docx:'📝', csv:'📊' };
+
+const fmt = b => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(1)+'MB';
+
+function selectFile(file) {
+  if (!file) return;
+  selectedFile = file;
+  const ext = file.name.split('.').pop().toLowerCase();
+  document.getElementById('fp-icon').textContent = FILE_ICONS[ext] || '📄';
+  document.getElementById('fp-name').textContent  = file.name;
+  document.getElementById('fp-size').textContent  = fmt(file.size);
+  filePill.style.display = 'flex';
+  dropZone.style.display = 'none';
+  ingestBtn.disabled = false;
+  clearLog();
+}
+
+function clearFile() {
+  selectedFile = null;
+  fileInput.value = '';
+  filePill.style.display = 'none';
+  dropZone.style.display = 'block';
+  ingestBtn.disabled = true;
+  clearLog();
+}
+
+fileInput.addEventListener('change', e => selectFile(e.target.files[0]));
+document.getElementById('fp-clear').addEventListener('click', clearFile);
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  selectFile(e.dataTransfer.files[0]);
+});
+
+// ── Log helpers ───────────────────────────────────────────────────────────────
+function clearLog() { ingestLog.innerHTML = ''; ingestLog.style.display = 'none'; }
+
+function log(msg, type = '') {
+  ingestLog.style.display = 'block';
+  const ln = document.createElement('div');
+  if (type) ln.className = `log-${type}`;
+  ln.textContent = msg;
+  ingestLog.appendChild(ln);
+  ingestLog.scrollTop = ingestLog.scrollHeight;
+}
+
+function setProgress(pct) {
+  progWrap.style.display = 'block';
+  progBar.style.width = pct + '%';
+  if (pct >= 100) setTimeout(() => { progWrap.style.display='none'; progBar.style.width='0'; }, 700);
+}
+
+// ── Ingest ────────────────────────────────────────────────────────────────────
+ingestBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  ingestBtn.disabled = true;
+  document.getElementById('ingest-icon').textContent  = '⏳';
+  document.getElementById('ingest-label').textContent = 'Ingesting…';
+  clearLog();
+  setProgress(15);
+  log(`▸ Reading ${selectedFile.name}…`);
+
+  const form = new FormData();
+  form.append('file',            selectedFile);
+  form.append('source_language', document.getElementById('ingest-src').value);
+  form.append('target_language', document.getElementById('ingest-tgt').value);
+  form.append('domain',          document.getElementById('ingest-domain').value);
+  form.append('register',        document.getElementById('ingest-register').value);
+
+  setProgress(35);
+  log('▸ Uploading and chunking…');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/ingest/upload`, { method:'POST', body:form });
+    setProgress(85);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      log(`✗ Error ${res.status}: ${err.detail || 'Ingest failed'}`, 'error');
+    } else {
+      const data = await res.json();
+      setProgress(100);
+      log(`✓ Ingested ${data.chunks_added} chunks from "${selectedFile.name}"`, 'ok');
+      addKbDoc({
+        name:   selectedFile.name,
+        chunks: data.chunks_added,
+        domain: document.getElementById('ingest-domain').value,
+        lang:   document.getElementById('ingest-src').value || 'auto',
+        size:   fmt(selectedFile.size),
+      });
+      setTimeout(clearFile, 1200);
+    }
+  } catch (err) {
+    setProgress(0);
+    log(`✗ Network error: ${err.message}`, 'error');
+    log('  Is make run-api running on port 8000?', 'warn');
   }
 
-  function renderMd(text) {
-    return text
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/\n/g, '<br>');
+  document.getElementById('ingest-icon').textContent  = '✨';
+  document.getElementById('ingest-label').textContent = 'Ingest Document';
+  ingestBtn.disabled = !selectedFile;
+});
+
+// ── KB list ───────────────────────────────────────────────────────────────────
+function addKbDoc(doc) {
+  kbDocs.push(doc);
+  document.getElementById('kb-empty')?.remove();
+  const ext  = doc.name.split('.').pop().toLowerCase();
+  const item = document.createElement('div');
+  item.className = 'kb-item';
+  item.innerHTML = `
+    <span class="kb-icon">${FILE_ICONS[ext]||'📄'}</span>
+    <div class="kb-info">
+      <div class="kb-name" title="${doc.name}">${doc.name}</div>
+      <div class="kb-meta">${doc.chunks} chunks · ${doc.size} · ${doc.lang}</div>
+    </div>
+    <span class="kb-badge">${doc.domain}</span>
+  `;
+  kbList.appendChild(item);
+  kbCount.textContent = kbDocs.length;
+  kbCount.classList.add('visible');
+}
+
+// ── Health check ──────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) });
+    const d = await r.json();
+    document.getElementById('dot-gemini').classList.toggle('ok', !!d.providers?.gemini?.available);
+    document.getElementById('dot-anthropic').classList.toggle('ok', !!d.providers?.anthropic?.available);
+  } catch { /* offline */ }
+}
+checkHealth();
+setInterval(checkHealth, 30000);
+
+// ── Chat helpers ──────────────────────────────────────────────────────────────
+function fillInput(el) { input.value = el.textContent.trim(); resize(); sendBtn.disabled = false; input.focus(); }
+function resize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight,140)+'px'; }
+
+function renderMd(t) {
+  return t
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+    .replace(/`(.+?)`/g,       '<code>$1</code>')
+    .replace(/\n/g,            '<br>');
+}
+
+function addMsg(role, html) {
+  document.getElementById('empty')?.remove();
+  const row = document.createElement('div');
+  row.className = `msg ${role}`;
+  row.innerHTML = `<div class="avatar ${role}">${role==='ai'?'AI':'You'}</div><div class="bubble"><div class="bubble-inner">${html}</div></div>`;
+  thread.appendChild(row);
+  thread.scrollTop = thread.scrollHeight;
+  return row;
+}
+
+function addTyping() {
+  document.getElementById('empty')?.remove();
+  const row = document.createElement('div');
+  row.id = 'typing'; row.className = 'msg ai';
+  row.innerHTML = `<div class="avatar ai">AI</div><div class="bubble"><div class="bubble-inner dots"><span></span><span></span><span></span></div></div>`;
+  thread.appendChild(row);
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function attachMeta(row, resp) {
+  const bubble   = row.querySelector('.bubble');
+  const provider = resp.provider || 'gemini';
+  const src = resp.detected_source_language || '';
+  const tgt = resp.detected_target_language || '';
+  const ms  = resp.latency_ms ? resp.latency_ms.toFixed(0) : '–';
+
+  // Tags
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.innerHTML = `
+    <span class="tag ${provider}">${provider.toUpperCase()}</span>
+    <span class="tag">${ms} ms</span>
+    ${(src||tgt) ? `<span class="tag lang">${src||'?'} → ${tgt||'?'}</span>` : ''}
+  `;
+  bubble.appendChild(meta);
+
+  // Self-query filter pill
+  const filt = resp.applied_filter;
+  if (filt && Object.values(filt).some(v => v)) {
+    const pill = document.createElement('div');
+    pill.className = 'filter-pill';
+    const entries = Object.entries(filt).filter(([,v])=>v).map(([k,v])=>`${k}: ${v}`).join(' · ');
+    pill.innerHTML = `🔎 Auto-filter <span class="filter-detail">${entries}</span> <span class="arr">▸</span>`;
+    pill.addEventListener('click', () => {
+      const open = pill.classList.toggle('open');
+      pill.querySelector('.filter-detail').style.display = open ? 'block' : 'none';
+      pill.querySelector('.arr').textContent = open ? '▾' : '▸';
+    });
+    bubble.appendChild(pill);
   }
 
-  function addMsg(role, html) {
-    document.getElementById('empty')?.remove();
-    const row = document.createElement('div');
-    row.className = `msg ${role}`;
-    row.innerHTML = `<div class="avatar ${role}">${role === 'ai' ? 'AI' : 'You'}</div><div class="bubble">${html}</div>`;
-    thread.appendChild(row);
-    thread.scrollTop = thread.scrollHeight;
+  // Sources
+  if (resp.sources?.length) {
+    const det = document.createElement('details');
+    det.className = 'sources';
+    det.innerHTML = `<summary>📚 ${resp.sources.length} source${resp.sources.length>1?'s':''}</summary>`;
+    resp.sources.forEach((s, i) => {
+      const item = document.createElement('div');
+      item.className = 'source-item';
+      const pg  = s.page ? `, p.${s.page}` : '';
+      const sc  = typeof s.score==='number' ? s.score.toFixed(3) : '–';
+      const dom = s.metadata?.domain ? ` · ${s.metadata.domain}` : '';
+      item.innerHTML = `<div class="sn">${i+1}. ${s.source}${pg} — ${sc}${dom}</div><div class="st">"${(s.text||'').slice(0,250)}…"</div>`;
+      det.appendChild(item);
+    });
+    bubble.appendChild(det);
   }
+}
 
-  function addTyping() {
-    const row = document.createElement('div');
-    row.className = 'msg ai'; row.id = 'typing';
-    row.innerHTML = `<div class="avatar ai">AI</div><div class="bubble dots"><span></span><span></span><span></span></div>`;
-    thread.appendChild(row);
-    thread.scrollTop = thread.scrollHeight;
-  }
+// ── Send ──────────────────────────────────────────────────────────────────────
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = ''; resize(); sendBtn.disabled = true;
+  addMsg('user', renderMd(text));
+  addTyping();
 
-  async function send() {
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = ''; resize(); sendBtn.disabled = true;
-    addMsg('user', renderMd(text));
-    addTyping();
-    await new Promise(r => setTimeout(r, 700 + Math.random() * 600));
+  const body = {
+    query:              text,
+    top_k:              5,
+    preferred_provider: document.getElementById('provider-pref').value,
+    source_language:    document.getElementById('src-lang').value  || null,
+    target_language:    document.getElementById('tgt-lang').value  || null,
+  };
+  const domain = document.getElementById('domain').value;
+  if (domain) body.metadata_filter = { domain };
+
+  try {
+    const res = await fetch(`${API_BASE}/api/query`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    });
     document.getElementById('typing')?.remove();
-    addMsg('ai', renderMd(getReply(text)));
-    sendBtn.disabled = false; input.focus();
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      addMsg('ai', `⚠️ <strong>Error ${res.status}:</strong> ${err.detail||'Unknown error'}`);
+    } else {
+      const resp = await res.json();
+      const row  = addMsg('ai', renderMd(resp.answer||''));
+      attachMeta(row, resp);
+    }
+  } catch (err) {
+    document.getElementById('typing')?.remove();
+    addMsg('ai', `⚠️ <strong>Cannot reach the API.</strong> Is <code>make run-api</code> running?<br><small>${err.message}</small>`);
   }
 
-  function resize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 160) + 'px'; }
+  sendBtn.disabled = false;
+  input.focus();
+}
 
-  input.addEventListener('input', () => { resize(); sendBtn.disabled = !input.value.trim(); });
-  input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!sendBtn.disabled) send(); } });
-  sendBtn.addEventListener('click', send);
+input.addEventListener('input',   () => { resize(); sendBtn.disabled = !input.value.trim(); });
+input.addEventListener('keydown', e  => { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sendBtn.disabled)send();} });
+sendBtn.addEventListener('click', send);
 </script>
 </body>
 </html>
